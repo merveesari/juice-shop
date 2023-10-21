@@ -21,6 +21,8 @@ jobs:
   semgrep:
     name: semgrep
     runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
     steps:
     - name: FetchSourceCode
       uses: actions/checkout@v3
