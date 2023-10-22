@@ -1,23 +1,40 @@
-const injectionChars = /"|'|;|and|or|;|#/i;
+module.exports = function searchProducts() {
+  return (req, res, next) => {
+    const criteria = req.query.q || '';
+    const sanitizedCriteria = criteria.substring(0, 200);
 
-module.exports = function searchProducts () {
-  return (req: Request, res: Response, next: NextFunction) => {
-    let criteria: any = req.query.q === 'undefined' ? '' : req.query.q ?? ''
-    criteria = (criteria.length <= 200) ? criteria : criteria.substring(0, 200)
-    if (criteria.match(injectionChars)) {
-      res.status(400).send()
-      return
-    }
-    models.sequelize.query(`SELECT * FROM Products WHERE ((name LIKE '%${criteria}%' OR description LIKE '%${criteria}%') AND deletedAt IS NULL) ORDER BY name`)
-      .then(([products]: any) => {
-        const dataString = JSON.stringify(products)
-        for (let i = 0; i < products.length; i++) {
-          products[i].name = req.__(products[i].name)
-          products[i].description = req.__(products[i].description)
-        }
-        res.json(utils.queryResultToJson(products))
-      }).catch((error: ErrorWithParent) => {
-        next(error.parent)
+    // SQL Injection'i önlemek için parametrelerle çalışan bir sorgu kullan
+    const query = {
+      where: {
+        deletedAt: null,
+        [Op.or]: [
+          {
+            name: {
+              [Op.like]: `%${sanitizedCriteria}%`
+            }
+          },
+          {
+            description: {
+              [Op.like]: `%${sanitizedCriteria}%`
+            }
+          }
+        ]
+      },
+      order: ['name']
+    };
+
+    ProductModel.findAll(query)
+      .then((products) => {
+        const sanitizedProducts = products.map((product) => {
+          return {
+            name: req.__(product.name),
+            description: req.__(product.description)
+          };
+        });
+        res.json(sanitizedProducts);
       })
+      .catch((error) => {
+        next(error);
+      });
   }
 }
